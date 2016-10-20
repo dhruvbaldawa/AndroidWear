@@ -9,7 +9,7 @@
     android:baselineAligned="false"
     android:orientation="vertical">
     <TextView
-        android:id="@+id/timeTextView"
+        android:id="@+id/time_text_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
@@ -18,7 +18,7 @@
         android:textSize="30sp" />
 
     <TextView
-        android:id="@+id/dateTextView"
+        android:id="@+id/date_text_view"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
@@ -31,21 +31,21 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content">
 
-        <TextView
-            android:id="@+id/iconImageView"
+        <ImageView
+            android:id="@+id/icon_image_view"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1" />
 
         <TextView
-            android:id="@+id/highTemperatureTextView"
+            android:id="@+id/high_temperature_text_view"
             android:text="25*"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1" />
 
         <TextView
-            android:id="@+id/lowTemperatureTextView"
+            android:id="@+id/low_temperature_text_view"
             android:text="16*"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

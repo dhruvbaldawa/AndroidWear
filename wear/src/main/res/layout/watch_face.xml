@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:textColor="@color/white"
-        android:text="Hello World"
+        tools:text="11:00AM"
         android:textSize="30sp" />
 
     <TextView
@@ -23,7 +23,7 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:textColor="@color/grey"
-        android:text="Today, April 03"
+        tools:text="April 03, 2016"
         android:textAppearance="@style/TextAppearance.WearDiag.Message" />
 
     <LinearLayout
@@ -39,14 +39,14 @@
 
         <TextView
             android:id="@+id/high_temperature_text_view"
-            android:text="25*"
+            tools:text="25°"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1" />
 
         <TextView
             android:id="@+id/low_temperature_text_view"
-            android:text="16*"
+            tools:text="16°"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1" />

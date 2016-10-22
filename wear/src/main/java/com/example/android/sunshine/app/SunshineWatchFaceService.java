@@ -23,7 +23,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -32,7 +31,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
-import android.text.format.Time;
+import android.text.format.DateFormat;
 import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
@@ -43,6 +42,7 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import java.util.Calendar;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -91,8 +91,9 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                mTime.clear(intent.getStringExtra("time-zone"));
-                mTime.setToNow();
+                mCalendar.setTimeZone(TimeZone.getTimeZone(intent.getStringExtra("time-zone")));
+                mCalendar.clear();
+                mCalendar.setTimeInMillis(System.currentTimeMillis());
             }
         };
 
@@ -100,7 +101,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
 
         boolean mAmbient;
 
-        Time mTime;
+        Calendar mCalendar;
 
         float mXOffset = 0;
         float mYOffset = 0;
@@ -129,9 +130,8 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                     .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
                     .setShowSystemUiTime(false)
                     .build());
-            Resources resources = SunshineWatchFaceService.this.getResources();
 
-            mTime = new Time();
+            mCalendar = Calendar.getInstance();
 
             // Inflate the layout that we're using for the watch face
             LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
@@ -164,8 +164,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                 registerReceiver();
 
                 // Update time zone in case it changed while we weren't visible.
-                mTime.clear(TimeZone.getDefault().getID());
-                mTime.setToNow();
+                mCalendar.setTimeZone(TimeZone.getDefault());
             } else {
                 unregisterReceiver();
             }
@@ -247,18 +246,21 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
 
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
-            // Get the current Time
-            mTime.setToNow();
+            mCalendar.setTimeInMillis(System.currentTimeMillis());
 
-            mTimeTextView.setText(mTime.toString());
-            mDateTextView.setText(mTime.toString());
+            final java.text.DateFormat dateFormat = DateFormat.getLongDateFormat(SunshineWatchFaceService.this);
+            final java.text.DateFormat timeFormat = DateFormat.getTimeFormat(SunshineWatchFaceService.this);
+
+            mTimeTextView.setText(timeFormat.format(mCalendar.getTime()));
+            mDateTextView.setText(dateFormat.format(mCalendar.getTime()));
 
             // Update the layout
             myLayout.measure(specW, specH);
             myLayout.layout(0, 0, myLayout.getMeasuredWidth(), myLayout.getMeasuredHeight());
 
+            Resources resources = SunshineWatchFaceService.this.getResources();
             // Draw it to the Canvas
-            canvas.drawColor(Color.BLACK);
+            canvas.drawColor(resources.getColor(R.color.primary));
             canvas.translate(mXOffset, mYOffset);
             myLayout.draw(canvas);
         }

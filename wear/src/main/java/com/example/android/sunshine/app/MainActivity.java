@@ -46,6 +46,7 @@ public class MainActivity extends Activity {
         // Just use the user's locale to show the date and time
         final java.text.DateFormat dateFormat = DateFormat.getLongDateFormat(this);
         final java.text.DateFormat timeFormat = DateFormat.getTimeFormat(this);
+
         runOnUiThread(new Runnable() {
             @Override
             public void run() {

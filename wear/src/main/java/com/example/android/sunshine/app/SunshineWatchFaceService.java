@@ -36,6 +36,7 @@ import android.support.annotation.Nullable;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
 import android.text.format.DateFormat;
+import android.util.Log;
 import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
@@ -67,6 +68,7 @@ import java.util.concurrent.TimeUnit;
  * low-bit ambient mode, the text is drawn without anti-aliasing in ambient mode.
  */
 public class SunshineWatchFaceService extends CanvasWatchFaceService {
+    private static final String LOG_TAG = "SunshineWatchFace";
     private static final Typeface NORMAL_TYPEFACE =
             Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
 
@@ -156,7 +158,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
-
+            mGoogleApiClient.connect();
             setWatchFaceStyle(new WatchFaceStyle.Builder(SunshineWatchFaceService.this)
                     .setCardPeekMode(WatchFaceStyle.PEEK_MODE_SHORT)
                     .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
@@ -197,7 +199,6 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             super.onVisibilityChanged(visible);
 
             if (visible) {
-                mGoogleApiClient.connect();
                 registerReceiver();
 
                 // Update time zone in case it changed while we weren't visible.
@@ -362,20 +363,22 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         @Override
         public void onConnected(@Nullable Bundle bundle) {
             Wearable.DataApi.addListener(mGoogleApiClient, Engine.this);
+            Log.d(LOG_TAG, "Connected!");
         }
 
         @Override
         public void onConnectionSuspended(int i) {
-
+            Log.d(LOG_TAG, "Connection suspended!");
         }
 
         @Override
         public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
+            Log.d(LOG_TAG, "Connection failed!");
         }
 
         @Override
         public void onDataChanged(DataEventBuffer dataEventBuffer) {
+            Log.d(LOG_TAG, "got data change event!");
             for (DataEvent event : dataEventBuffer) {
                 if (event.getType() == DataEvent.TYPE_CHANGED) {
                     // DataItem changed
@@ -385,6 +388,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                         mWeatherIcon = dataMap.getAsset(DATA_ITEM_WEATHER_ICON_KEY);
                         mLowTemperature = dataMap.getString(DATA_ITEM_LOW_TEMPERATURE_KEY);
                         mHighTemperature = dataMap.getString(DATA_ITEM_HIGH_TEMPERATURE_KEY);
+                        invalidate();
                     }
                 }
             }

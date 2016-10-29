@@ -18,7 +18,6 @@ import android.content.SyncResult;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -40,7 +39,6 @@ import com.example.android.sunshine.app.muzei.WeatherMuzeiSource;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
@@ -51,7 +49,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -105,7 +102,6 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
                 @Override
                 public void onConnected(Bundle connectionHint) {
                     Log.d(LOG_TAG, "onConnected: " + connectionHint);
-                    // Now you can use the Data Layer API
                 }
                 @Override
                 public void onConnectionSuspended(int cause) {
@@ -365,11 +361,6 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
                 weatherValues.put(WeatherContract.WeatherEntry.COLUMN_SHORT_DESC, description);
                 weatherValues.put(WeatherContract.WeatherEntry.COLUMN_WEATHER_ID, weatherId);
 
-                // Send data to the Wearable if today's information is present
-                if (i == 0) {
-                    Log.d(LOG_TAG, "sending to wearable today!");
-                    sendToWearable(weatherId, low, high);
-                }
                 cVVector.add(weatherValues);
             }
 
@@ -389,6 +380,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
                 updateMuzei();
                 notifyWeather();
             }
+            sendToWearable();
             Log.d(LOG_TAG, "Sync Complete. " + cVVector.size() + " Inserted");
             setLocationStatus(getContext(), LOCATION_STATUS_OK);
 
@@ -399,40 +391,48 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
         }
     }
 
-    private static Asset createAssetFromBitmap(Bitmap bitmap) {
-        final ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteStream);
-        return Asset.createFromBytes(byteStream.toByteArray());
-    }
+    private void sendToWearable() {
+        String locationQuery = Utility.getPreferredLocation(getContext());
 
-    private void sendToWearable(int weatherId, double low, double high) {
-        final String DATA_ITEM_PATH = "/sunshine";
-        final String DATA_ITEM_LOW_TEMPERATURE_KEY = "low-temperature";
-        final String DATA_ITEM_HIGH_TEMPERATURE_KEY = "high-temperature";
-        final String DATA_ITEM_WEATHER_ICON_KEY = "weather-icon";
+        Uri weatherUri = WeatherContract.WeatherEntry.buildWeatherLocationWithDate(locationQuery, System.currentTimeMillis());
 
-        PutDataMapRequest putDataMapReq = PutDataMapRequest.create(DATA_ITEM_PATH).setUrgent();
-        putDataMapReq.getDataMap().putString(DATA_ITEM_LOW_TEMPERATURE_KEY,
-                Utility.formatTemperature(getContext(), (int)low));
-        putDataMapReq.getDataMap().putString(DATA_ITEM_HIGH_TEMPERATURE_KEY,
-                Utility.formatTemperature(getContext(), (int)high));
+        // we'll query our contentProvider, as always
+        Cursor cursor = getContext().getContentResolver().query(weatherUri, NOTIFY_WEATHER_PROJECTION, null, null, null);
 
-        int iconId = Utility.getIconResourceForWeatherCondition(weatherId);
-        Bitmap iconBitmap = BitmapFactory.decodeResource(getContext().getResources(), iconId);
-        putDataMapReq.getDataMap().putAsset(DATA_ITEM_WEATHER_ICON_KEY, createAssetFromBitmap(iconBitmap));
+        if (cursor.moveToFirst()) {
+            int weatherId = cursor.getInt(INDEX_WEATHER_ID);
+            double high = cursor.getDouble(INDEX_MAX_TEMP);
+            double low = cursor.getDouble(INDEX_MIN_TEMP);
 
-        PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
-        Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq)
-            .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
-                @Override
-                public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
-                    if (dataItemResult.getStatus().isSuccess()) {
-                        Log.d(LOG_TAG, "Successfully sent to wearable!");
-                    } else {
-                        Log.d(LOG_TAG, "Failure sending to wearable..");
-                    }
-                }
-            });
+            final String DATA_ITEM_PATH = "/sunshine";
+            final String DATA_ITEM_LOW_TEMPERATURE_KEY = "low-temperature";
+            final String DATA_ITEM_HIGH_TEMPERATURE_KEY = "high-temperature";
+            final String DATA_ITEM_WEATHER_ICON_KEY = "weather-icon";
+            final String DATA_ITEM_TIME_KEY = "not-using-this";
+
+            PutDataMapRequest putDataMapReq = PutDataMapRequest.create(DATA_ITEM_PATH).setUrgent();
+            putDataMapReq.getDataMap().putString(DATA_ITEM_LOW_TEMPERATURE_KEY,
+                    Utility.formatTemperature(getContext(), (int) low));
+            putDataMapReq.getDataMap().putString(DATA_ITEM_HIGH_TEMPERATURE_KEY,
+                    Utility.formatTemperature(getContext(), (int) high));
+            putDataMapReq.getDataMap().putInt(DATA_ITEM_WEATHER_ICON_KEY, weatherId);
+            putDataMapReq.getDataMap().putDouble(DATA_ITEM_TIME_KEY, System.currentTimeMillis());
+
+            PutDataRequest putDataReq = putDataMapReq.asPutDataRequest();
+            Wearable.DataApi.putDataItem(mGoogleApiClient, putDataReq)
+                    .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                        @Override
+                        public void onResult(@NonNull DataApi.DataItemResult dataItemResult) {
+                            if (dataItemResult.getStatus().isSuccess()) {
+                                Log.d(LOG_TAG, "Successfully sent to wearable!");
+                            } else {
+                                Log.d(LOG_TAG, "Failure sending to wearable..");
+                            }
+                        }
+                    });
+            Log.d(LOG_TAG, "Sending request: " + putDataMapReq);
+        }
+        cursor.close();
     }
 
     private void updateWidgets() {

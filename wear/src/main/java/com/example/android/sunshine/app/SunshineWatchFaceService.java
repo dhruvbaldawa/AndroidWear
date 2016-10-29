@@ -49,7 +49,6 @@ import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
@@ -58,7 +57,7 @@ import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.Wearable;
 
-import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.util.Calendar;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
@@ -71,6 +70,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
     private static final String LOG_TAG = "SunshineWatchFace";
     private static final Typeface NORMAL_TYPEFACE =
             Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
+    static final int MSG_UPDATE_TIME = 0;
 
     /**
      * Update rate in milliseconds for interactive mode. We update once a second since seconds are
@@ -83,9 +83,28 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         return new Engine();
     }
 
+    private static class EngineHandler extends Handler {
+        private final WeakReference<SunshineWatchFaceService.Engine> mWeakReference;
+
+        public EngineHandler(SunshineWatchFaceService.Engine reference) {
+            mWeakReference = new WeakReference<>(reference);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            SunshineWatchFaceService.Engine engine = mWeakReference.get();
+            if (engine != null) {
+                switch (msg.what) {
+                    case MSG_UPDATE_TIME:
+                        engine.handleUpdateTimeMessage();
+                        break;
+                }
+            }
+        }
+    }
+
     private class Engine extends CanvasWatchFaceService.Engine implements DataApi.DataListener,
             GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
-        static final int MSG_UPDATE_TIME = 0;
         static final String DATA_ITEM_PATH = "/sunshine";
         static final String DATA_ITEM_LOW_TEMPERATURE_KEY = "low-temperature";
         static final String DATA_ITEM_HIGH_TEMPERATURE_KEY = "high-temperature";
@@ -145,7 +164,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         private TextView mLowTemperatureTextView;
         private final Point displaySize = new Point();
 
-        private Asset mWeatherIcon;
+        private Bitmap mWeatherIcon;
         private String mLowTemperature;
         private String mHighTemperature;
 
@@ -158,7 +177,6 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
-            mGoogleApiClient.connect();
             setWatchFaceStyle(new WatchFaceStyle.Builder(SunshineWatchFaceService.this)
                     .setCardPeekMode(WatchFaceStyle.PEEK_MODE_SHORT)
                     .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
@@ -199,6 +217,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             super.onVisibilityChanged(visible);
 
             if (visible) {
+                mGoogleApiClient.connect();
                 registerReceiver();
 
                 // Update time zone in case it changed while we weren't visible.
@@ -298,15 +317,15 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             mDateTextView.setText(dateFormat.format(mCalendar.getTime()));
 
             if (mWeatherIcon != null) {
-                mIconImageView.setImageBitmap(loadBitmapFromAsset(mWeatherIcon));
+                mIconImageView.setImageBitmap(mWeatherIcon);
             }
 
             if (mLowTemperature != null) {
-                mLowTemperatureTextView.setText(mLowTemperature + "°");
+                mLowTemperatureTextView.setText(mLowTemperature);
             }
 
             if (mHighTemperature != null) {
-                mHighTemperatureTextView.setText(mHighTemperature + "°");
+                mHighTemperatureTextView.setText(mHighTemperature);
             }
 
             // Update the layout
@@ -318,27 +337,6 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             canvas.drawColor(resources.getColor(R.color.primary));
             canvas.translate(mXOffset, mYOffset);
             myLayout.draw(canvas);
-        }
-
-        public Bitmap loadBitmapFromAsset(Asset asset) {
-            if (asset == null) {
-                throw new IllegalArgumentException("Asset must be non-null");
-            }
-            ConnectionResult result =
-                    mGoogleApiClient.blockingConnect(TIMEOUT_MS, TimeUnit.MILLISECONDS);
-            if (!result.isSuccess()) {
-                return null;
-            }
-            // convert asset into a file descriptor and block until it's ready
-            InputStream assetInputStream = Wearable.DataApi.getFdForAsset(
-                    mGoogleApiClient, asset).await().getInputStream();
-            mGoogleApiClient.disconnect();
-
-            if (assetInputStream == null) {
-                return null;
-            }
-            // decode the stream into a bitmap
-            return BitmapFactory.decodeStream(assetInputStream);
         }
 
         /**
@@ -385,12 +383,26 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                     DataItem item = event.getDataItem();
                     if (item.getUri().getPath().compareTo(DATA_ITEM_PATH) == 0) {
                         DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
-                        mWeatherIcon = dataMap.getAsset(DATA_ITEM_WEATHER_ICON_KEY);
+                        int weatherId = dataMap.getInt(DATA_ITEM_WEATHER_ICON_KEY);
+                        mWeatherIcon = BitmapFactory.decodeResource(getResources(), Utility.getIconResourceForWeatherCondition(weatherId));
                         mLowTemperature = dataMap.getString(DATA_ITEM_LOW_TEMPERATURE_KEY);
                         mHighTemperature = dataMap.getString(DATA_ITEM_HIGH_TEMPERATURE_KEY);
                         invalidate();
                     }
                 }
+            }
+        }
+
+        /**
+         * Handle updating the time periodically in interactive mode.
+         */
+        private void handleUpdateTimeMessage() {
+            invalidate();
+            if (shouldTimerBeRunning()) {
+                long timeMs = System.currentTimeMillis();
+                long delayMs = INTERACTIVE_UPDATE_RATE_MS
+                        - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
+                mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
             }
         }
     }

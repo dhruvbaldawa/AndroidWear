@@ -158,7 +158,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
         @Override
         public void onCreate(SurfaceHolder holder) {
             super.onCreate(holder);
-
+            mGoogleApiClient.connect();
             setWatchFaceStyle(new WatchFaceStyle.Builder(SunshineWatchFaceService.this)
                     .setCardPeekMode(WatchFaceStyle.PEEK_MODE_SHORT)
                     .setBackgroundVisibility(WatchFaceStyle.BACKGROUND_VISIBILITY_INTERRUPTIVE)
@@ -199,7 +199,6 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             super.onVisibilityChanged(visible);
 
             if (visible) {
-                mGoogleApiClient.connect();
                 registerReceiver();
 
                 // Update time zone in case it changed while we weren't visible.
@@ -369,12 +368,12 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
 
         @Override
         public void onConnectionSuspended(int i) {
-
+            Log.d(LOG_TAG, "Connection suspended!");
         }
 
         @Override
         public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
+            Log.d(LOG_TAG, "Connection failed!");
         }
 
         @Override
@@ -389,6 +388,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                         mWeatherIcon = dataMap.getAsset(DATA_ITEM_WEATHER_ICON_KEY);
                         mLowTemperature = dataMap.getString(DATA_ITEM_LOW_TEMPERATURE_KEY);
                         mHighTemperature = dataMap.getString(DATA_ITEM_HIGH_TEMPERATURE_KEY);
+                        invalidate();
                     }
                 }
             }

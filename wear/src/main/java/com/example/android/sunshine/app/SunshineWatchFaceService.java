@@ -25,6 +25,7 @@ import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -41,10 +42,10 @@ import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -157,6 +158,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
 
         private int specW, specH;
         private View myLayout;
+        private LinearLayout mContainer;
         private TextView mTimeTextView;
         private TextView mDateTextView;
         private ImageView mIconImageView;
@@ -195,6 +197,7 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             display.getSize(displaySize);
 
             // Find some views for later use
+            mContainer = (LinearLayout) myLayout.findViewById(R.id.container);
             mTimeTextView = (TextView) myLayout.findViewById(R.id.time_text_view);
             mDateTextView = (TextView) myLayout.findViewById(R.id.date_text_view);
             mIconImageView = (ImageView) myLayout.findViewById(R.id.icon_image_view);
@@ -288,16 +291,6 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
             super.onAmbientModeChanged(inAmbientMode);
             if (mAmbient != inAmbientMode) {
                 mAmbient = inAmbientMode;
-
-                // Switch between bold & normal font
-                Typeface font = Typeface.create("sans-serif-condensed",
-                        inAmbientMode ? Typeface.NORMAL : Typeface.BOLD);
-                ViewGroup group = (ViewGroup) myLayout;
-                for (int i = group.getChildCount() - 1; i >= 0; i--) {
-                    // We only get away with this because every child is a TextView
-                    ((TextView) group.getChildAt(i)).setTypeface(font);
-                }
-
                 invalidate();
             }
 
@@ -312,6 +305,12 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
 
             final java.text.DateFormat dateFormat = DateFormat.getLongDateFormat(SunshineWatchFaceService.this);
             final java.text.DateFormat timeFormat = DateFormat.getTimeFormat(SunshineWatchFaceService.this);
+
+            // Update the layout
+            myLayout.measure(specW, specH);
+            myLayout.layout(0, 0, myLayout.getMeasuredWidth(), myLayout.getMeasuredHeight());
+
+            Resources resources = SunshineWatchFaceService.this.getResources();
 
             mTimeTextView.setText(timeFormat.format(mCalendar.getTime()));
             mDateTextView.setText(dateFormat.format(mCalendar.getTime()));
@@ -328,13 +327,23 @@ public class SunshineWatchFaceService extends CanvasWatchFaceService {
                 mHighTemperatureTextView.setText(mHighTemperature);
             }
 
-            // Update the layout
-            myLayout.measure(specW, specH);
-            myLayout.layout(0, 0, myLayout.getMeasuredWidth(), myLayout.getMeasuredHeight());
-
-            Resources resources = SunshineWatchFaceService.this.getResources();
             // Draw it to the Canvas
-            canvas.drawColor(resources.getColor(R.color.primary));
+            if (mAmbient) {
+                canvas.drawColor(Color.BLACK);
+                mContainer.setBackgroundColor(Color.BLACK);
+                mLowTemperatureTextView.setVisibility(View.INVISIBLE);
+                mHighTemperatureTextView.setVisibility(View.INVISIBLE);
+                mIconImageView.setVisibility(View.INVISIBLE);
+            }
+            else {
+                canvas.drawColor(resources.getColor(R.color.primary));
+                mContainer.setBackgroundColor(resources.getColor(R.color.primary));
+
+                mLowTemperatureTextView.setVisibility(View.VISIBLE);
+                mHighTemperatureTextView.setVisibility(View.VISIBLE);
+                mIconImageView.setVisibility(View.VISIBLE);
+            }
+
             canvas.translate(mXOffset, mYOffset);
             myLayout.draw(canvas);
         }
